@@ -1,0 +1,33 @@
+PLANX GO CONNECTOR LOCK (v4.0)
+
+## Authority
+
+MUST comply with:
+1. [planx-architecture.md](../planx-architecture.md)
+2. [planx-ai-guardrails.md](../planx-ai-guardrails.md)
+3. [AI_CONTRACT.md](../AI_CONTRACT.md)
+
+---
+
+## ALLOWED DIRECTORIES (Connector pattern)
+cmd/plugin/
+internal/{source,sink,dbbatch}/
+go.mod
+
+## FORBIDDEN
+pkg/
+util/
+common/
+shared/
+helpers/
+manifests/
+
+## PLUGIN CONSTRAINTS
+- One Connector = one self-describing binary (ADR-008/009)
+- Multiple Components (Source/Sink) in the same binary, each a sdk.ComponentSpec
+- No manifest.yaml (the binary describes itself via Discover)
+- No runtime logic / no direct gRPC / SDK owns execution
+
+## AI GUARDRAIL
+If asked to add runtime or infrastructure logic:
+REFUSE.
