@@ -48,12 +48,31 @@ func EncodeRow(values []any) (DBRow, error) {
 	vals := make([]string, len(values))
 	for i, v := range values {
 		switch x := v.(type) {
+		// pgx decodes PG int2→int16, int4→int32, int8→int64; mssqldb has
+		// its own width mapping. Coerce ALL integer widths to int64 so
+		// they land on KindInt (the canonical widened form on the wire).
 		case int64:
 			types[i] = KindInt
 			vals[i] = strconv.FormatInt(x, 10)
+		case int:
+			types[i] = KindInt
+			vals[i] = strconv.FormatInt(int64(x), 10)
+		case int32:
+			types[i] = KindInt
+			vals[i] = strconv.FormatInt(int64(x), 10)
+		case int16:
+			types[i] = KindInt
+			vals[i] = strconv.FormatInt(int64(x), 10)
+		case int8:
+			types[i] = KindInt
+			vals[i] = strconv.FormatInt(int64(x), 10)
+		// float4(real)→float32 on pgx; widen to float64 for KindFloat.
 		case float64:
 			types[i] = KindFloat
 			vals[i] = strconv.FormatFloat(x, 'f', -1, 64)
+		case float32:
+			types[i] = KindFloat
+			vals[i] = strconv.FormatFloat(float64(x), 'f', -1, 64)
 		case string:
 			types[i] = KindString
 			vals[i] = x

@@ -99,6 +99,16 @@ func TestEncodeRowPerKind(t *testing.T) {
 	}{
 		{"int64", int64(42), KindInt, "42"},
 		{"int64_negative", int64(-7), KindInt, "-7"},
+		// pgx type mapping: PG int2→int16, int4→int32, int8→int64,
+		// float4(real)→float32, float8(double)→float64. EncodeRow must
+		// accept all int widths (→KindInt via int64) and float32
+		// (→KindFloat via float64). Regression for the e2e bug where
+		// int32 (PG int4) hit "unsupported type".
+		{"int8", int8(7), KindInt, "7"},
+		{"int16", int16(42), KindInt, "42"},
+		{"int32", int32(7), KindInt, "7"},
+		{"int", int(99), KindInt, "99"},
+		{"float32", float32(1.5), KindFloat, "1.5"},
 		{"float64_precision", float64(3.14159), KindFloat, "3.14159"},
 		{"float64_zero", float64(0), KindFloat, "0"},
 		{"string", "alice", KindString, "alice"},
@@ -150,11 +160,14 @@ func TestEncodeRowMultiple(t *testing.T) {
 }
 
 // TestEncodeRowUnknownType verifies unsupported types yield an error rather
-// than silent coercion (design: pick error for safety).
+// than silent coercion (design: pick error for safety). Note: int32 is now a
+// SUPPORTED type (pgx maps PG int4 → int32), so use a struct as the
+// genuinely-unsupported type here.
 func TestEncodeRowUnknownType(t *testing.T) {
-	_, err := encodeRow([]any{int32(5)}) // int32 is not in the encode table
+	type weird struct{ X int }
+	_, err := encodeRow([]any{weird{X: 1}})
 	if err == nil {
-		t.Fatal("encodeRow(int32) = nil, want error")
+		t.Fatal("encodeRow(struct) = nil, want error")
 	}
 }
 
