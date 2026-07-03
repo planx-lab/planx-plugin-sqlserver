@@ -47,14 +47,8 @@ type Sink struct {
 // New returns a zero-value Sink satisfying sdk.SinkSPI.
 func New() sdk.SinkSPI { return &Sink{} }
 
-func init() {
-	// dbbatch types must be gob-registered on BOTH the source and sink
-	// processes for the SDK's gob-through-interface codec to round-trip
-	// (design §3). Exactly two calls; the top-level type is concrete. The
-	// source registers them too; double-registration is a no-op.
-	sdk.RegisterType(dbbatch.DBBatch{})
-	sdk.RegisterType(dbbatch.DBRow{})
-}
+// dbbatch gob registration is centralized in the dbbatch package's init()
+// (gob.RegisterName under a shared wire name for cross-connector interop).
 
 // Init parses config, validates required fields, applies defaults, builds the
 // DSN, connects (sql.Open), and pings. The connection handle is stored as a

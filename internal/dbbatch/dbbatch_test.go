@@ -9,14 +9,11 @@ import (
 	"time"
 )
 
-// registerForGob mirrors the two sdk.RegisterType calls that source/sink
-// init() MUST make. Registering here keeps the test faithful to the real
-// per-process registration set (DBBatch{} + DBRow{}) — nothing more.
-func registerForGob(t *testing.T) {
-	t.Helper()
-	gob.Register(DBBatch{})
-	gob.Register(DBRow{})
-}
+// The dbbatch package init() now registers DBBatch/DBRow via
+// gob.RegisterName under a SHARED wire name ("planx.io/dbbatch.*") so
+// cross-connector interop works (pg-source → mssql-sink). No manual
+// registration here — init() runs before any test, and double-registering
+// under a different (natural) name panics.
 
 // wrapper mirrors the SDK's internal batch codec shape (see
 // planx-sdk-go/internal/batch/codec.go: batchWrapper{Batch any}). The real
@@ -33,8 +30,6 @@ type wrapper struct {
 // If a future commit drops sdk.RegisterType(DBBatch{})/DBRow{} from
 // source/sink init(), this test fails loudly.
 func TestGobRoundTrip(t *testing.T) {
-	registerForGob(t)
-
 	orig := DBBatch{
 		Columns: []string{"id", "name", "ratio", "active", "at", "blob", "note"},
 		Rows: []DBRow{

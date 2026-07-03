@@ -9,10 +9,20 @@ package dbbatch
 
 import (
 	"encoding/base64"
+	"encoding/gob"
 	"fmt"
 	"strconv"
 	"time"
 )
+
+func init() {
+	// Register under a shared wire name so cross-connector gob interop works
+	// (pg-source can feed mssql-sink). Without this, gob uses the full Go
+	// package path as the type name — different per repo despite byte-identical
+	// struct definitions.
+	gob.RegisterName("planx.io/dbbatch.DBBatch", DBBatch{})
+	gob.RegisterName("planx.io/dbbatch.DBRow", DBRow{})
+}
 
 // DBBatch is the gob-registered batch payload for DB row data. Carries the
 // column schema once at the top plus per-row type-tagged string slots.
