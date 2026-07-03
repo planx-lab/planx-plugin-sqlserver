@@ -17,10 +17,10 @@ import (
 // same package so it can satisfy the unexported querier/rowsIterator interfaces.
 // grep mssqldb / sql.Open in _test.go -> nothing (real DB never reached).
 //
-// The seam is ScanValues() (NOT pgx's Values()): mssql scans via
-// reflect.New(ct.ScanType()).Interface() ptrs -> rows.Scan -> deref. The fake
-// short-circuits this and yields already-deref'd []any, which is exactly what
-// the production mssqlRows returns from ScanValues after dereferencing.
+// The seam is ScanValues() (NOT pgx's Values()): mssql scans into *interface{}
+// (new(any)) ptrs -> rows.Scan -> deref. The fake short-circuits this and yields
+// already-deref'd []any, which is exactly what the production mssqlRows returns
+// from ScanValues after dereferencing.
 
 // fakeRows is a rowsIterator over a fixed slice of value-rows.
 type fakeRows struct {

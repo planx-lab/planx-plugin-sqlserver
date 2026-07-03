@@ -3,7 +3,7 @@ package source
 import (
 	"context"
 	"database/sql"
-	"reflect"
+	"fmt"
 
 	// go-mssqldb registers the "sqlserver" database/sql driver on import via its
 	// init(); the blank import is required so sql.Open(driverName, ...) resolves.
@@ -20,10 +20,10 @@ type querier interface {
 }
 
 // rowsIterator mirrors the subset of *sql.Rows the Source needs. The seam is
-// ScanValues (NOT pgx's Values): mssql scans via
-// reflect.New(ct.ScanType()).Interface() ptrs -> rows.Scan -> deref. The
-// production mssqlRows returns the already-deref'd []any from this method; the
-// fake short-circuits the reflect path and yields the same deref'd []any.
+// ScanValues (NOT pgx's Values): mssql scans into *interface{} (new(any)) ptrs
+// -> rows.Scan -> deref. The production mssqlRows returns the already-deref'd
+// []any from this method; the fake short-circuits and yields the same deref'd
+// []any.
 type rowsIterator interface {
 	Next() bool
 	Columns() []string
@@ -47,11 +47,13 @@ func (q *mssqlQuerier) Query(ctx context.Context, query string, args ...any) (ro
 
 func (q *mssqlQuerier) Close() { q.db.Close() }
 
-// mssqlRows adapts *sql.Rows to rowsIterator. ScanValues allocates a pointer
-// per column via reflect on the column's ScanType, scans into them, then
-// dereferences each into the returned []any. This is the database/sql-native
-// equivalent of pgx's Values() and yields concrete Go types (int64, float64,
-// string, bool, time.Time, []byte, nil) for dbbatch.EncodeRow.
+// mssqlRows adapts *sql.Rows to rowsIterator. ScanValues scans each column
+// into a *interface{} (new(any)): NULL → nil, non-NULL → the driver's concrete
+// Go type (int64, float64, string, bool, time.Time, []byte). This is the
+// database/sql-native equivalent of pgx's Values() and yields the same concrete
+// types for dbbatch.EncodeRow. Scanning into new(any) is NULL-safe — unlike
+// reflect.New(ct.ScanType()), which creates non-nullable types (e.g. string for
+// NVARCHAR) that database/sql refuses to fill on NULL.
 type mssqlRows struct {
 	rows     *sql.Rows
 	colTypes []*sql.ColumnType
@@ -64,44 +66,30 @@ func (r *mssqlRows) Columns() []string {
 	return cols
 }
 
-// ScanValues performs the reflect-Scan then deref (design §4 scanRow, mssql path).
-// Column types are lazily captured on first call.
+// ScanValues scans each column into a *interface{}. NULL columns become nil
+// (which dbbatch.EncodeRow maps to KindNil); non-NULL columns arrive as the
+// driver's concrete type (int64, float64, string, bool, time.Time, []byte).
+// Column types are lazily captured on first call to size the slice.
 func (r *mssqlRows) ScanValues() ([]any, error) {
 	if r.colTypes == nil {
 		r.colTypes, _ = r.rows.ColumnTypes()
 	}
 	ptrs := make([]any, len(r.colTypes))
-	for i, ct := range r.colTypes {
-		ptrs[i] = reflect.New(ct.ScanType()).Interface()
+	for i := range ptrs {
+		ptrs[i] = new(any) // *interface{} — NULL-safe, heterogeneous
 	}
 	if err := r.rows.Scan(ptrs...); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("sqlserver source: scan: %w", err)
 	}
 	vals := make([]any, len(ptrs))
 	for i, p := range ptrs {
-		vals[i] = derefValue(p)
+		vals[i] = *(p.(*any))
 	}
 	return vals, nil
 }
 
 func (r *mssqlRows) Err() error { return r.rows.Err() }
 func (r *mssqlRows) Close()     { r.rows.Close() }
-
-// derefValue unwraps a reflect.New pointer to its concrete value. A typed
-// pointer to the zero value remains the zero value (e.g. *int64 -> int64(0)),
-// which dbbatch.EncodeRow handles by kind. NULL columns arrive as a typed
-// pointer whose driver Value is nil; mssqldb surfaces those as nil here after
-// deref when the ScanType is an interface or the driver returns nil.
-func derefValue(p any) any {
-	v := reflect.ValueOf(p)
-	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
-		if v.IsNil() {
-			return nil
-		}
-		v = v.Elem()
-	}
-	return v.Interface()
-}
 
 // driverName is the database/sql registration name for go-mssqldb. The "mssql"
 // alias is deprecated and has unfixed bugs (design §2).
