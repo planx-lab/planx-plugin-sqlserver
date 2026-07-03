@@ -73,9 +73,6 @@ func (s *Source) Init(ctx context.Context, cfg []byte) error {
 	s.q = q
 
 	cols := s.cfg.Columns
-	if cols == "" {
-		cols = "*"
-	}
 	query := fmt.Sprintf("SELECT %s FROM %s", cols, s.cfg.Table)
 	rows, err := s.q.Query(context.Background(), query)
 	if err != nil {
@@ -128,6 +125,12 @@ func validateConfig(cfg *Config) error {
 	}
 	if cfg.Table == "" {
 		return fmt.Errorf("sqlserver source: table is required")
+	}
+	if cfg.Columns == "" {
+		// Empty columns used to fall back to "SELECT *" — dangerous if the
+		// upstream schema changes (silent pipeline breakage). Require an
+		// explicit column selection.
+		return fmt.Errorf("sqlserver source: columns is required — select at least one column")
 	}
 	return nil
 }

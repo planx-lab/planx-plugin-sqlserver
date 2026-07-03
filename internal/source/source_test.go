@@ -109,11 +109,12 @@ func TestSource_Init_MissingRequired(t *testing.T) {
 		json string
 		want string // substring of the missing field
 	}{
-		{"host", `{"database":"d","user":"u","password":"p","table":"dbo.t"}`, "host"},
-		{"database", `{"host":"h","user":"u","password":"p","table":"dbo.t"}`, "database"},
-		{"user", `{"host":"h","database":"d","password":"p","table":"dbo.t"}`, "user"},
-		{"password", `{"host":"h","database":"d","user":"u","table":"dbo.t"}`, "password"},
-		{"table", `{"host":"h","database":"d","user":"u","password":"p"}`, "table"},
+		{"host", `{"database":"d","user":"u","password":"p","table":"dbo.t","columns":"id"}`, "host"},
+		{"database", `{"host":"h","user":"u","password":"p","table":"dbo.t","columns":"id"}`, "database"},
+		{"user", `{"host":"h","database":"d","password":"p","table":"dbo.t","columns":"id"}`, "user"},
+		{"password", `{"host":"h","database":"d","user":"u","table":"dbo.t","columns":"id"}`, "password"},
+		{"table", `{"host":"h","database":"d","user":"u","password":"p","columns":"id"}`, "table"},
+		{"columns", `{"host":"h","database":"d","user":"u","password":"p","table":"dbo.t","columns":""}`, "columns"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -130,9 +131,27 @@ func TestSource_Init_MissingRequired(t *testing.T) {
 	}
 }
 
+// TestSource_Init_EmptyColumns_Error verifies the empty-columns safety guard:
+// "columns" must not be empty because that used to fall back to "SELECT *",
+// which silently breaks pipelines when the upstream schema changes.
+func TestSource_Init_EmptyColumns_Error(t *testing.T) {
+	var cfg Config
+	raw := `{"host":"h","database":"d","user":"u","password":"p","table":"dbo.users","columns":""}`
+	if err := parseConfig(raw, &cfg); err != nil {
+		t.Fatalf("parseConfig: %v", err)
+	}
+	err := validateConfig(&cfg)
+	if err == nil {
+		t.Fatal("expected error for empty columns")
+	}
+	if !contains(err.Error(), "columns is required") {
+		t.Fatalf("expected 'columns is required' error, got %q", err.Error())
+	}
+}
+
 func TestSource_Init_DefaultsApplied(t *testing.T) {
 	var cfg Config
-	raw := `{"host":"h","database":"d","user":"u","password":"p","table":"dbo.t"}`
+	raw := `{"host":"h","database":"d","user":"u","password":"p","table":"dbo.t","columns":"id"}`
 	if err := parseConfig(raw, &cfg); err != nil {
 		t.Fatalf("parseConfig: %v", err)
 	}
