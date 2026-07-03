@@ -80,13 +80,13 @@ func TestSource_Init_ParsesValidConfig(t *testing.T) {
 	// Init attempts a real connection; we only assert config parsing succeeds.
 	// To keep this DB-free, we unit-test the parse via a private helper.
 	cfg := Config{}
-	raw := `{"host":"db","port":1433,"database":"shop","user":"u","password":"p","query":"SELECT 1","batchRows":50,"encrypt":"true"}`
+	raw := `{"host":"db","port":1433,"database":"shop","user":"u","password":"p","table":"dbo.t","columns":"id,name","batchRows":50,"encrypt":"true"}`
 	if err := parseConfig(raw, &cfg); err != nil {
 		t.Fatalf("parseConfig: %v", err)
 	}
 	if cfg.Host != "db" || cfg.Port != 1433 || cfg.Database != "shop" ||
-		cfg.User != "u" || cfg.Password != "p" || cfg.Query != "SELECT 1" ||
-		cfg.BatchRows != 50 || cfg.Encrypt != "true" {
+		cfg.User != "u" || cfg.Password != "p" || cfg.Table != "dbo.t" ||
+		cfg.Columns != "id,name" || cfg.BatchRows != 50 || cfg.Encrypt != "true" {
 		t.Fatalf("parsed config mismatch: %+v", cfg)
 	}
 }
@@ -109,11 +109,11 @@ func TestSource_Init_MissingRequired(t *testing.T) {
 		json string
 		want string // substring of the missing field
 	}{
-		{"host", `{"database":"d","user":"u","password":"p","query":"q"}`, "host"},
-		{"database", `{"host":"h","user":"u","password":"p","query":"q"}`, "database"},
-		{"user", `{"host":"h","database":"d","password":"p","query":"q"}`, "user"},
-		{"password", `{"host":"h","database":"d","user":"u","query":"q"}`, "password"},
-		{"query", `{"host":"h","database":"d","user":"u","password":"p"}`, "query"},
+		{"host", `{"database":"d","user":"u","password":"p","table":"dbo.t"}`, "host"},
+		{"database", `{"host":"h","user":"u","password":"p","table":"dbo.t"}`, "database"},
+		{"user", `{"host":"h","database":"d","password":"p","table":"dbo.t"}`, "user"},
+		{"password", `{"host":"h","database":"d","user":"u","table":"dbo.t"}`, "password"},
+		{"table", `{"host":"h","database":"d","user":"u","password":"p"}`, "table"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -132,7 +132,7 @@ func TestSource_Init_MissingRequired(t *testing.T) {
 
 func TestSource_Init_DefaultsApplied(t *testing.T) {
 	var cfg Config
-	raw := `{"host":"h","database":"d","user":"u","password":"p","query":"q"}`
+	raw := `{"host":"h","database":"d","user":"u","password":"p","table":"dbo.t"}`
 	if err := parseConfig(raw, &cfg); err != nil {
 		t.Fatalf("parseConfig: %v", err)
 	}

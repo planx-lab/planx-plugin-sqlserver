@@ -16,13 +16,18 @@ import (
 )
 
 // Config configures the sqlserver-source component (design §4 ConfigSchema).
+// The raw-SQL `query` field was replaced (ADR-013) by `table`+`columns`: the
+// Source now builds `SELECT {cols} FROM {table}` internally so no user-supplied
+// SQL reaches the DB. DiscoverSchema introspects information_schema to guide
+// table/column selection in the Designer.
 type Config struct {
 	Host      string `json:"host"`
 	Port      int    `json:"port"`
 	Database  string `json:"database"`
 	User      string `json:"user"`
 	Password  string `json:"password"`
-	Query     string `json:"query"`
+	Table     string `json:"table"`
+	Columns   string `json:"columns"`
 	BatchRows int    `json:"batchRows"`
 	Encrypt   string `json:"encrypt"`
 }
@@ -49,8 +54,9 @@ func New() sdk.SourceSPI { return &Source{} }
 // dbbatch gob registration is centralized in the dbbatch package's init()
 // (gob.RegisterName under a shared wire name for cross-connector interop).
 
-// Init parses config, validates required fields, applies defaults, builds the
-// DSN, connects (sql.Open), pings, and issues the SELECT to obtain a rows cursor.
+// Init parses config, validates required fields, applies defaults, connects
+// (sql.Open), and issues the SELECT — built internally from table+columns
+// (ADR-013) — to obtain a rows cursor. No user-supplied SQL reaches the DB.
 func (s *Source) Init(ctx context.Context, cfg []byte) error {
 	if err := parseConfig(string(cfg), &s.cfg); err != nil {
 		return err
@@ -60,18 +66,18 @@ func (s *Source) Init(ctx context.Context, cfg []byte) error {
 	}
 	applyDefaults(&s.cfg)
 
-	dsn := buildDSN(s.cfg)
-	db, err := sql.Open(driverName, dsn)
+	q, err := ConnectQuerier(ctx, s.cfg)
 	if err != nil {
-		return fmt.Errorf("sqlserver source: connect: %w", err)
+		return err
 	}
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return fmt.Errorf("sqlserver source: ping: %w", err)
-	}
-	s.q = &mssqlQuerier{db: db}
+	s.q = q
 
-	rows, err := s.q.Query(context.Background(), s.cfg.Query)
+	cols := s.cfg.Columns
+	if cols == "" {
+		cols = "*"
+	}
+	query := fmt.Sprintf("SELECT %s FROM %s", cols, s.cfg.Table)
+	rows, err := s.q.Query(context.Background(), query)
 	if err != nil {
 		s.q.Close()
 		return fmt.Errorf("sqlserver source: query: %w", err)
@@ -79,6 +85,22 @@ func (s *Source) Init(ctx context.Context, cfg []byte) error {
 	s.rows = rows
 	s.columns = rows.Columns()
 	return nil
+}
+
+// ConnectQuerier builds the DSN, opens a *sql.DB, and pings. Extracted from
+// Init so DiscoverSchema can reuse the same connect path against a temporary
+// connection (opened, queried, closed) without constructing a Source.
+func ConnectQuerier(ctx context.Context, cfg Config) (Querier, error) {
+	dsn := buildDSN(cfg)
+	db, err := sql.Open(driverName, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("sqlserver source: connect: %w", err)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("sqlserver source: ping: %w", err)
+	}
+	return &mssqlQuerier{db: db}, nil
 }
 
 // parseConfig unmarshals the JSON config, wrapping parse errors with the
@@ -104,8 +126,8 @@ func validateConfig(cfg *Config) error {
 	if cfg.Password == "" {
 		return fmt.Errorf("sqlserver source: password is required")
 	}
-	if cfg.Query == "" {
-		return fmt.Errorf("sqlserver source: query is required")
+	if cfg.Table == "" {
+		return fmt.Errorf("sqlserver source: table is required")
 	}
 	return nil
 }

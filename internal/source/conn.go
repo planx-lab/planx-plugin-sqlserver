@@ -11,13 +11,19 @@ import (
 	_ "github.com/microsoft/go-mssqldb"
 )
 
-// querier is the DB-free testability seam (design §8). The production Source
-// holds a *sql.DB-backed querier; tests inject a fakeQuerier that yields canned
+// Querier is the DB-free testability seam (design §8). The production Source
+// holds a *sql.DB-backed Querier; tests inject a fakeQuerier that yields canned
 // rows. This is THE single decision that lets unit tests run without SQL Server.
-type querier interface {
+// Exported so DiscoverSchema's connect callback signature can name the type
+// (main.go wires the real ConnectQuerier, tests inject a fake).
+type Querier interface {
 	Query(ctx context.Context, query string, args ...any) (rowsIterator, error)
 	Close()
 }
+
+// querier is a package-internal alias kept so existing Source code reads
+// naturally; new code should prefer the exported Querier.
+type querier = Querier
 
 // rowsIterator mirrors the subset of *sql.Rows the Source needs. The seam is
 // ScanValues (NOT pgx's Values): mssql scans into *interface{} (new(any)) ptrs
