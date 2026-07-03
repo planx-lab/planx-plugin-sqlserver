@@ -146,8 +146,8 @@ func TestSource_Init_DefaultsApplied(t *testing.T) {
 	if cfg.BatchRows != 1000 {
 		t.Errorf("batchRows default: got %d, want 1000", cfg.BatchRows)
 	}
-	if cfg.Encrypt != "false" {
-		t.Errorf("encrypt default: got %q, want %q", cfg.Encrypt, "false")
+	if cfg.Encrypt != "disable" {
+		t.Errorf("encrypt default: got %q, want %q", cfg.Encrypt, "disable")
 	}
 }
 

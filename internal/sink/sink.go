@@ -32,7 +32,7 @@ type Config struct {
 const (
 	defaultPort      = 1433
 	defaultBatchRows = 1000
-	defaultEncrypt   = "false"
+	defaultEncrypt   = "disable"
 )
 
 // Sink prepared-INSERTs DBBatch rows in a single transaction per batch (design

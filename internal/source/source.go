@@ -30,7 +30,7 @@ type Config struct {
 const (
 	defaultPort      = 1433
 	defaultBatchRows = 1000
-	defaultEncrypt   = "false"
+	defaultEncrypt   = "disable"
 )
 
 // Source reads a finite SELECT result set in row batches. EOF terminates the

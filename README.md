@@ -33,7 +33,7 @@ engine; it Discovers the connector automatically (ADR-008, no manifest).
 | `password` | SECRET | yes | — | DB password (masked, never logged) |
 | `query` | STRING | yes | — | SELECT query (finite result set) |
 | `batchRows` | INTEGER | no | 1000 | Rows per batch |
-| `encrypt` | ENUM | no | `false` | Encrypt connection (TLS) — one of `true`, `false` |
+| `encrypt` | ENUM | no | `disable` | Encrypt connection (TLS) — one of `disable` (no TLS), `false` (TLS without cert verify), `true` (TLS with cert verify). Default `disable` for dev. |
 
 ### Sink component
 | Field | Type | Required | Default | Description |
@@ -46,7 +46,7 @@ engine; it Discovers the connector automatically (ADR-008, no manifest).
 | `table` | STRING | yes | — | Target table (e.g. `dbo.users`) |
 | `columns` | STRING | no | — | Comma-separated column list; if empty, uses batch column schema |
 | `batchRows` | INTEGER | no | 1000 | Rows per INSERT transaction |
-| `encrypt` | ENUM | no | `false` | Encrypt connection (TLS) — one of `true`, `false` |
+| `encrypt` | ENUM | no | `disable` | Encrypt connection (TLS) — one of `disable` (no TLS), `false` (TLS without cert verify), `true` (TLS with cert verify). Default `disable` for dev. |
 
 The Sink is append-only in v1 (prepared INSERT path; no upsert/MERGE).
 

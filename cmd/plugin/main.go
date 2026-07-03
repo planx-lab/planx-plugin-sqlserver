@@ -23,7 +23,7 @@ func main() {
 					sdk.SecretField("password", sdk.Required(), sdk.WithDescription("DB password")),
 					sdk.StringField("query", sdk.Required(), sdk.WithExample("SELECT * FROM dbo.users"), sdk.WithDescription("SELECT query (finite result set)")),
 					sdk.IntegerField("batchRows", sdk.WithDefault(sdk.IntValue(1000)), sdk.WithDescription("Rows per batch")),
-					sdk.EnumField("encrypt", []string{"true", "false"}, sdk.WithDefault(sdk.StringValue("false")), sdk.WithDescription("Encrypt connection (TLS)")),
+					sdk.EnumField("encrypt", []string{"disable", "false", "true"}, sdk.WithDefault(sdk.StringValue("disable")), sdk.WithDescription("Encrypt connection (TLS)")),
 				),
 			},
 			{
@@ -37,7 +37,7 @@ func main() {
 					sdk.StringField("table", sdk.Required(), sdk.WithDescription("Target table (e.g. dbo.users)")),
 					sdk.StringField("columns", sdk.WithDescription("Comma-separated column list; if empty, uses batch column schema")),
 					sdk.IntegerField("batchRows", sdk.WithDefault(sdk.IntValue(1000)), sdk.WithDescription("Rows per INSERT transaction")),
-					sdk.EnumField("encrypt", []string{"true", "false"}, sdk.WithDefault(sdk.StringValue("false"))),
+					sdk.EnumField("encrypt", []string{"disable", "false", "true"}, sdk.WithDefault(sdk.StringValue("disable"))),
 				),
 			},
 		},
